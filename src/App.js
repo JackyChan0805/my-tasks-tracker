@@ -1,24 +1,13 @@
 import React, { useState, useEffect } from 'react';
 
 function App() {
+  // State declarations
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState('');
   const [filter, setFilter] = useState('all');
   const [showTimeInput, setShowTimeInput] = useState(null);
 
-  // Load tasks from localStorage when page loads
-  useEffect(() => {
-    const saved = localStorage.getItem('myTasks');
-    if (saved) {
-      setTasks(JSON.parse(saved));
-    }
-  }, []);
-
-  // Save tasks to localStorage whenever tasks change
-  useEffect(() => {
-    localStorage.setItem('myTasks', JSON.stringify(tasks));
-  }, [tasks]);
-
+  // Function: Add new task
   const addTask = () => {
     if (input.trim() === '') return;
 
@@ -34,6 +23,7 @@ function App() {
     setInput('');
   };
 
+  // Function: Toggle task completion status
   const toggleDone = (id) => {
     setTasks(tasks.map(task => {
       if (task.id === id) {
@@ -48,12 +38,14 @@ function App() {
     }));
   };
 
+  // Function: Delete task
   const deleteTask = (id) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
       setTasks(tasks.filter(task => task.id !== id));
     }
   };
 
+  // Function: Add or edit manual time
   const addTimeSpent = (id, minutes) => {
     const time = parseInt(minutes, 10);
     if (isNaN(time) || time <= 0) {
@@ -66,6 +58,7 @@ function App() {
     setShowTimeInput(null);
   };
 
+  // Helper: Format minutes to readable string
   const formatTime = (minutes) => {
     if (!minutes && minutes !== 0) return null;
     if (minutes < 60) return `${minutes} min`;
@@ -75,6 +68,7 @@ function App() {
     return `${hours} hr ${mins} min`;
   };
 
+  // Helper: Calculate duration from creation to completion
   const getCompletionDuration = (task) => {
     if (!task.completedAt || !task.createdAt) return null;
     const durationMs = task.completedAt - task.createdAt;
@@ -82,18 +76,44 @@ function App() {
     return durationMinutes;
   };
 
+  // Helper: Format timestamp to readable date/time
   const formatDate = (timestamp) => {
     if (!timestamp) return null;
     const date = new Date(timestamp);
     return date.toLocaleString();
   };
 
+  // Load tasks from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('myTasks');
+    if (saved) {
+      const parsedTasks = JSON.parse(saved);
+      // Fix old tasks that might be missing new fields
+      const fixedTasks = parsedTasks.map(task => ({
+        id: task.id,
+        text: task.text,
+        done: task.done || false,
+        createdAt: task.createdAt || Date.now(),
+        completedAt: task.completedAt || null,
+        timeSpent: task.timeSpent || null
+      }));
+      setTasks(fixedTasks);
+    }
+  }, []);
+
+  // Save tasks to localStorage whenever tasks change
+  useEffect(() => {
+    localStorage.setItem('myTasks', JSON.stringify(tasks));
+  }, [tasks]);
+
+  // Filter tasks based on selected filter
   const filteredTasks = tasks.filter(task => {
     if (filter === 'active') return !task.done;
     if (filter === 'completed') return task.done;
     return true;
   });
 
+  // Statistics
   const stats = {
     total: tasks.length,
     active: tasks.filter(t => !t.done).length,
@@ -109,6 +129,7 @@ function App() {
           Task Tracker
         </h1>
 
+        {/* Input Section */}
         <div style={styles.inputSection}>
           <input
             type="text"
@@ -123,6 +144,7 @@ function App() {
           </button>
         </div>
 
+        {/* Filter Buttons */}
         <div style={styles.filterSection}>
           <button
             onClick={() => setFilter('all')}
@@ -144,12 +166,14 @@ function App() {
           </button>
         </div>
 
+        {/* Stats Bar */}
         {stats.totalTime > 0 && (
           <div style={styles.statsBar}>
             ⏱️ Total manual time: {formatTime(stats.totalTime)}
           </div>
         )}
 
+        {/* Task List */}
         {filteredTasks.length === 0 ? (
           <div style={styles.emptyState}>
             <span style={styles.emptyIcon}>📭</span>
@@ -179,17 +203,20 @@ function App() {
                         >
                           {task.text}
                         </span>
-                        
+
+                        {/* Created time */}
                         <div style={styles.timeMeta}>
                           📅 Created: {formatDate(task.createdAt)}
                         </div>
-                        
+
+                        {/* Completion duration (auto-calculated) */}
                         {task.done && completionDuration !== null && (
                           <div style={styles.timeMetaSuccess}>
                             ✅ Completed in: {formatTime(completionDuration)}
                           </div>
                         )}
-                        
+
+                        {/* Manual time badge */}
                         {task.timeSpent && (
                           <div style={styles.timeBadge}>
                             ⏱️ Manual: {formatTime(task.timeSpent)}
@@ -253,6 +280,7 @@ function App() {
   );
 }
 
+// Styles
 const styles = {
   container: {
     minHeight: '100vh',
@@ -453,6 +481,7 @@ const styles = {
   }
 };
 
+// Add animation style to document
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes fadeIn {
