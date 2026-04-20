@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 function App() {
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState('');
-  const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed'
+  const [filter, setFilter] = useState('all');
+  const [showTimeInput, setShowTimeInput] = useState(null);
 
   // Load tasks from localStorage when page loads
   useEffect(() => {
@@ -22,27 +23,71 @@ function App() {
     if (input.trim() === '') return;
 
     const newTask = {
-      id: Date.now(),  // Use timestamp as unique id
+      id: Date.now(),
       text: input,
-      done: false
+      done: false,
+      createdAt: Date.now(),
+      completedAt: null,
+      timeSpent: null
     };
     setTasks([...tasks, newTask]);
     setInput('');
   };
 
   const toggleDone = (id) => {
-    setTasks(tasks.map(task =>
-      task.id === id ? { ...task, done: !task.done } : task
-    ));
+    setTasks(tasks.map(task => {
+      if (task.id === id) {
+        const newDoneState = !task.done;
+        return {
+          ...task,
+          done: newDoneState,
+          completedAt: newDoneState ? Date.now() : null
+        };
+      }
+      return task;
+    }));
   };
 
   const deleteTask = (id) => {
-    if(window.confirm("Are you sure you want to delete this task?")){
-    setTasks(tasks.filter(task => task.id !== id));
+    if (window.confirm('Are you sure you want to delete this task?')) {
+      setTasks(tasks.filter(task => task.id !== id));
     }
   };
 
-  // Filter tasks
+  const addTimeSpent = (id, minutes) => {
+    const time = parseInt(minutes, 10);
+    if (isNaN(time) || time <= 0) {
+      alert('Please enter a valid number (positive integer)');
+      return;
+    }
+    setTasks(tasks.map(task =>
+      task.id === id ? { ...task, timeSpent: time } : task
+    ));
+    setShowTimeInput(null);
+  };
+
+  const formatTime = (minutes) => {
+    if (!minutes && minutes !== 0) return null;
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (mins === 0) return `${hours} hr${hours > 1 ? 's' : ''}`;
+    return `${hours} hr ${mins} min`;
+  };
+
+  const getCompletionDuration = (task) => {
+    if (!task.completedAt || !task.createdAt) return null;
+    const durationMs = task.completedAt - task.createdAt;
+    const durationMinutes = Math.floor(durationMs / (1000 * 60));
+    return durationMinutes;
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+  };
+
   const filteredTasks = tasks.filter(task => {
     if (filter === 'active') return !task.done;
     if (filter === 'completed') return task.done;
@@ -52,18 +97,18 @@ function App() {
   const stats = {
     total: tasks.length,
     active: tasks.filter(t => !t.done).length,
-    completed: tasks.filter(t => t.done).length
+    completed: tasks.filter(t => t.done).length,
+    totalTime: tasks.reduce((sum, t) => sum + (t.timeSpent || 0), 0)
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
         <h1 style={styles.title}>
-          <span style={styles.titleIcon}>✅</span>
+          <span style={styles.titleIcon}>⏱️</span>
           Task Tracker
         </h1>
 
-        {/* Input Section */}
         <div style={styles.inputSection}>
           <input
             type="text"
@@ -78,7 +123,6 @@ function App() {
           </button>
         </div>
 
-        {/* Filter Buttons */}
         <div style={styles.filterSection}>
           <button
             onClick={() => setFilter('all')}
@@ -100,7 +144,12 @@ function App() {
           </button>
         </div>
 
-        {/* Task List */}
+        {stats.totalTime > 0 && (
+          <div style={styles.statsBar}>
+            ⏱️ Total manual time: {formatTime(stats.totalTime)}
+          </div>
+        )}
+
         {filteredTasks.length === 0 ? (
           <div style={styles.emptyState}>
             <span style={styles.emptyIcon}>📭</span>
@@ -108,31 +157,95 @@ function App() {
           </div>
         ) : (
           <ul style={styles.taskList}>
-            {filteredTasks.map((task) => (
-              <li key={task.id} style={styles.taskItem}>
-                <input
-                  type="checkbox"
-                  checked={task.done}
-                  onChange={() => toggleDone(task.id)}
-                  style={styles.checkbox}
-                />
-                <span
-                  style={{
-                    ...styles.taskText,
-                    ...(task.done ? styles.taskTextCompleted : {})
-                  }}
-                  onClick={() => toggleDone(task.id)}
-                >
-                  {task.text}
-                </span>
-                <button
-                  onClick={() => deleteTask(task.id)}
-                  style={styles.deleteButton}
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
+            {filteredTasks.map((task) => {
+              const completionDuration = getCompletionDuration(task);
+              return (
+                <li key={task.id} style={styles.taskItem}>
+                  <div style={styles.taskContent}>
+                    <div style={styles.taskLeft}>
+                      <input
+                        type="checkbox"
+                        checked={task.done}
+                        onChange={() => toggleDone(task.id)}
+                        style={styles.checkbox}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <span
+                          style={{
+                            ...styles.taskText,
+                            ...(task.done ? styles.taskTextCompleted : {})
+                          }}
+                          onClick={() => toggleDone(task.id)}
+                        >
+                          {task.text}
+                        </span>
+                        
+                        <div style={styles.timeMeta}>
+                          📅 Created: {formatDate(task.createdAt)}
+                        </div>
+                        
+                        {task.done && completionDuration !== null && (
+                          <div style={styles.timeMetaSuccess}>
+                            ✅ Completed in: {formatTime(completionDuration)}
+                          </div>
+                        )}
+                        
+                        {task.timeSpent && (
+                          <div style={styles.timeBadge}>
+                            ⏱️ Manual: {formatTime(task.timeSpent)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={styles.taskActions}>
+                      <button
+                        onClick={() => setShowTimeInput(task.id)}
+                        style={styles.timeButton}
+                      >
+                        {task.timeSpent ? '✏️ Edit time' : '⏱️ Add time'}
+                      </button>
+                      <button
+                        onClick={() => deleteTask(task.id)}
+                        style={styles.deleteButton}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                  {showTimeInput === task.id && (
+                    <div style={styles.timeInputContainer}>
+                      <input
+                        type="number"
+                        placeholder="Minutes spent"
+                        style={styles.timeInput}
+                        autoFocus
+                        defaultValue={task.timeSpent || ''}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            addTimeSpent(task.id, e.target.value);
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={(e) => {
+                          const input = e.target.previousSibling;
+                          addTimeSpent(task.id, input.value);
+                        }}
+                        style={styles.timeConfirmButton}
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setShowTimeInput(null)}
+                        style={styles.timeCancelButton}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -140,7 +253,6 @@ function App() {
   );
 }
 
-// Styles
 const styles = {
   container: {
     minHeight: '100vh',
@@ -151,7 +263,7 @@ const styles = {
     padding: '20px'
   },
   card: {
-    maxWidth: '600px',
+    maxWidth: '700px',
     width: '100%',
     backgroundColor: 'white',
     borderRadius: '20px',
@@ -180,7 +292,7 @@ const styles = {
     border: '2px solid #e0e0e0',
     borderRadius: '12px',
     outline: 'none',
-    transition: 'border-color 0.2s'
+    transition: 'borderColor 0.2s'
   },
   addButton: {
     padding: '14px 24px',
@@ -191,12 +303,12 @@ const styles = {
     border: 'none',
     borderRadius: '12px',
     cursor: 'pointer',
-    transition: 'background-color 0.2s'
+    transition: 'opacity 0.2s'
   },
   filterSection: {
     display: 'flex',
     gap: '10px',
-    marginBottom: '20px',
+    marginBottom: '15px',
     justifyContent: 'center'
   },
   filterButton: {
@@ -212,35 +324,82 @@ const styles = {
     backgroundColor: '#667eea',
     color: 'white'
   },
+  statsBar: {
+    textAlign: 'center',
+    padding: '10px',
+    marginBottom: '15px',
+    backgroundColor: '#f0f0f0',
+    borderRadius: '10px',
+    fontSize: '14px',
+    color: '#555'
+  },
   taskList: {
     listStyle: 'none',
     padding: 0,
     margin: 0
   },
   taskItem: {
-    display: 'flex',
-    alignItems: 'center',
     padding: '12px 0',
     borderBottom: '1px solid #eee',
     animation: 'fadeIn 0.3s ease'
   },
+  taskContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start'
+  },
+  taskLeft: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+    flex: 1
+  },
   checkbox: {
     width: '20px',
     height: '20px',
-    marginRight: '15px',
+    marginTop: '2px',
     cursor: 'pointer',
     accentColor: '#667eea'
   },
   taskText: {
-    flex: 1,
     fontSize: '16px',
     color: '#333',
     cursor: 'pointer',
-    transition: 'color 0.2s'
+    transition: 'color 0.2s',
+    display: 'inline-block'
   },
   taskTextCompleted: {
     textDecoration: 'line-through',
     color: '#aaa'
+  },
+  timeMeta: {
+    fontSize: '11px',
+    color: '#999',
+    marginTop: '4px'
+  },
+  timeMetaSuccess: {
+    fontSize: '11px',
+    color: '#4caf50',
+    marginTop: '2px'
+  },
+  timeBadge: {
+    fontSize: '11px',
+    color: '#667eea',
+    marginTop: '2px'
+  },
+  taskActions: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center'
+  },
+  timeButton: {
+    backgroundColor: '#f0f0f0',
+    border: 'none',
+    fontSize: '12px',
+    padding: '4px 8px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'background 0.2s'
   },
   deleteButton: {
     backgroundColor: 'transparent',
@@ -250,6 +409,37 @@ const styles = {
     color: '#ccc',
     transition: 'color 0.2s',
     padding: '5px 10px'
+  },
+  timeInputContainer: {
+    marginTop: '10px',
+    display: 'flex',
+    gap: '8px',
+    paddingLeft: '32px'
+  },
+  timeInput: {
+    flex: 1,
+    padding: '8px 12px',
+    fontSize: '14px',
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    outline: 'none'
+  },
+  timeConfirmButton: {
+    padding: '8px 16px',
+    fontSize: '14px',
+    backgroundColor: '#667eea',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer'
+  },
+  timeCancelButton: {
+    padding: '8px 16px',
+    fontSize: '14px',
+    backgroundColor: '#f0f0f0',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer'
   },
   emptyState: {
     textAlign: 'center',
@@ -263,7 +453,6 @@ const styles = {
   }
 };
 
-// Add animation style to document
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes fadeIn {
@@ -281,9 +470,6 @@ styleSheet.textContent = `
   }
   input:focus {
     border-color: #667eea;
-  }
-  button:hover {
-    opacity: 0.85;
   }
 `;
 document.head.appendChild(styleSheet);
