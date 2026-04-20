@@ -9,6 +9,7 @@ A simple task management web app built with React.
 - Add new tasks
 - Mark tasks as complete (click on task text)
 - Delete tasks
+- Time tracking of each task
 - Data persistence with localStorage (tasks survive page refresh)
 
 ## Tech Stack
