@@ -1,3 +1,4 @@
+import { prettyDOM } from '@testing-library/dom';
 import React, { useState, useEffect } from 'react';
 
 function App() {
@@ -7,42 +8,74 @@ function App() {
   const [filter, setFilter] = useState('all');
   const [showTimeInput, setShowTimeInput] = useState(null);
 
+  // Load tasks from api on mount
+  useEffect(() => {
+    fetch('http://localhost:5001/api/tasks')
+    .then(res => res.json())
+    .then(data => {
+      if(Array.isArray(data)){
+        setTasks(data);
+      }
+    })
+    .catch(err => console.error('Error loading tasks:', err))
+
+  }, []);
   // Function: Add new task
   const addTask = () => {
     if (input.trim() === '') return;
 
-    const newTask = {
-      id: Date.now(),
-      text: input,
-      done: false,
-      createdAt: Date.now(),
-      completedAt: null,
-      timeSpent: null
-    };
-    setTasks([...tasks, newTask]);
-    setInput('');
+    fetch('http://localhost:5001/api/tasks',{
+      method : "POST",
+      headers : {'Content-Type' : 'application/json'},
+      body: JSON.stringify({text : input ,done : false})
+    })
+    .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json()
+      })
+      .then(newTask => {
+        console.log("new tasks", newTask);
+        setTasks(preTasks => [...preTasks, newTask]);
+        setInput('');
+      })
+      .catch(err => {
+        console.error("addTask fail", err);
+        alert("add Tasks fail" + err.message);
+      });
   };
 
   // Function: Toggle task completion status
-  const toggleDone = (id) => {
-    setTasks(tasks.map(task => {
-      if (task.id === id) {
-        const newDoneState = !task.done;
-        return {
-          ...task,
-          done: newDoneState,
-          completedAt: newDoneState ? Date.now() : null
-        };
+  const toggleDone = (id, currentdone) => {
+    fetch(`http://localhost:5001/api/tasks/${id}`,{
+      method : "PUT",
+      headers : {'Content-Type': 'application/json'},
+      body: JSON.stringify({done : !currentdone})
+    })
+    .then(res => {
+      if(!res.ok){
+        throw new Error(`HTTP error! status: ${res.status}`);
       }
-      return task;
-    }));
+      return res.json()
+    })
+    .then(updatedTask =>{
+      setTasks(preTasks => preTasks.map(task => task.id === id ? updatedTask : task));
+    })
+    .catch(err => console.error('Error updating task:', err))
   };
 
   // Function: Delete task
   const deleteTask = (id) => {
-    if (window.confirm('Are you sure you want to delete this task?')) {
-      setTasks(tasks.filter(task => task.id !== id));
-    }
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+
+    fetch(`http://localhost:5001/api/tasks/${id}`,{
+      method: "DELETE",
+    })
+    .then(() => {
+      setTasks(prevTask => prevTask.filter(task => task.id !== id));
+    })
+    .catch(err => console.error('Error deleting task:', err));
   };
 
   // Function: Add or edit manual time
@@ -52,10 +85,18 @@ function App() {
       alert('Please enter a valid number (positive integer)');
       return;
     }
-    setTasks(tasks.map(task =>
-      task.id === id ? { ...task, timeSpent: time } : task
-    ));
-    setShowTimeInput(null);
+    
+    fetch(`http://localhost:5001/api/tasks/${id}`,{
+      method: "PUT",
+      headers: {'Content-Type' : 'application/json'},
+      body: JSON.stringify({timeSpent : time})
+    })
+    .then(res => res.json())
+    .then(updatedTask => {
+      setTasks(prev => prev.map(task => task.id === id ? updatedTask : task));
+      setShowTimeInput(null);
+    })
+    .catch(err => console.error('Error adding time:',err))
   };
 
   // Helper: Format minutes to readable string
@@ -83,28 +124,6 @@ function App() {
     return date.toLocaleString();
   };
 
-  // Load tasks from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('myTasks');
-    if (saved) {
-      const parsedTasks = JSON.parse(saved);
-      // Fix old tasks that might be missing new fields
-      const fixedTasks = parsedTasks.map(task => ({
-        id: task.id,
-        text: task.text,
-        done: task.done || false,
-        createdAt: task.createdAt || Date.now(),
-        completedAt: task.completedAt || null,
-        timeSpent: task.timeSpent || null
-      }));
-      setTasks(fixedTasks);
-    }
-  }, []);
-
-  // Save tasks to localStorage whenever tasks change
-  useEffect(() => {
-    localStorage.setItem('myTasks', JSON.stringify(tasks));
-  }, [tasks]);
 
   // Filter tasks based on selected filter
   const filteredTasks = tasks.filter(task => {
@@ -169,7 +188,7 @@ function App() {
         {/* Stats Bar */}
         {stats.totalTime > 0 && (
           <div style={styles.statsBar}>
-            ⏱️ Total manual time: {formatTime(stats.totalTime)}
+            ⏱️ Total working time: {formatTime(stats.totalTime)}
           </div>
         )}
 
@@ -190,7 +209,7 @@ function App() {
                       <input
                         type="checkbox"
                         checked={task.done}
-                        onChange={() => toggleDone(task.id)}
+                        onChange={() => toggleDone(task.id, task.done)}
                         style={styles.checkbox}
                       />
                       <div style={{ flex: 1 }}>
@@ -199,7 +218,7 @@ function App() {
                             ...styles.taskText,
                             ...(task.done ? styles.taskTextCompleted : {})
                           }}
-                          onClick={() => toggleDone(task.id)}
+                          onClick={() => toggleDone(task.id,task.done)}
                         >
                           {task.text}
                         </span>
