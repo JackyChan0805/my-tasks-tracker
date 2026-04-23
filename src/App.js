@@ -1,6 +1,8 @@
-import { prettyDOM } from '@testing-library/dom';
 import React, { useState, useEffect } from 'react';
 
+const API_URL = process.env.NODE_ENV === 'production'
+  ? 'https://task-tracker-backend.onrender.com'  // online backend address
+  : 'http://localhost:5001';                     // local backend address
 function App() {
   // State declarations
   const [tasks, setTasks] = useState([]);
@@ -10,7 +12,7 @@ function App() {
 
   // Load tasks from api on mount
   useEffect(() => {
-    fetch('http://localhost:5001/api/tasks')
+    fetch(`${API_URL}/api/tasks`)
     .then(res => res.json())
     .then(data => {
       if(Array.isArray(data)){
@@ -24,7 +26,7 @@ function App() {
   const addTask = () => {
     if (input.trim() === '') return;
 
-    fetch('http://localhost:5001/api/tasks',{
+    fetch(`${API_URL}/api/tasks`,{
       method : "POST",
       headers : {'Content-Type' : 'application/json'},
       body: JSON.stringify({text : input ,done : false})
@@ -48,7 +50,7 @@ function App() {
 
   // Function: Toggle task completion status
   const toggleDone = (id, currentdone) => {
-    fetch(`http://localhost:5001/api/tasks/${id}`,{
+    fetch(`${API_URL}/api/tasks/${id}`,{
       method : "PUT",
       headers : {'Content-Type': 'application/json'},
       body: JSON.stringify({done : !currentdone})
@@ -69,7 +71,7 @@ function App() {
   const deleteTask = (id) => {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
 
-    fetch(`http://localhost:5001/api/tasks/${id}`,{
+    fetch(`${API_URL}/api/tasks/${id}`,{
       method: "DELETE",
     })
     .then(() => {
@@ -86,7 +88,7 @@ function App() {
       return;
     }
     
-    fetch(`http://localhost:5001/api/tasks/${id}`,{
+    fetch(`${API_URL}/${id}`,{
       method: "PUT",
       headers: {'Content-Type' : 'application/json'},
       body: JSON.stringify({timeSpent : time})
