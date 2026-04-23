@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 const API_URL = process.env.NODE_ENV === 'production'
-  ? 'my-tasks-tracker-backend-production.up.railway.app' // online backend address
+  ? 'https://my-tasks-tracker-backend-production.up.railway.app' // online backend address
   : 'http://localhost:5001';                     // local backend address
 function App() {
   // State declarations
@@ -88,7 +88,7 @@ function App() {
       return;
     }
     
-    fetch(`${API_URL}/${id}`,{
+    fetch(`${API_URL}/api/tasks/${id}`,{
       method: "PUT",
       headers: {'Content-Type' : 'application/json'},
       body: JSON.stringify({timeSpent : time})
