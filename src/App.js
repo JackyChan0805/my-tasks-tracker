@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 const API_URL = process.env.NODE_ENV === 'production'
-  ? 'https://task-tracker-backend.onrender.com'  // online backend address
+  ? 'my-tasks-tracker-backend-production.up.railway.app' // online backend address
   : 'http://localhost:5001';                     // local backend address
 function App() {
   // State declarations
